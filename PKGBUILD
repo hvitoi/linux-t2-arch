@@ -1,6 +1,6 @@
-# Maintainer: Jan Alexander Steffens (heftig) <heftig@archlinux.org>
+# Maintainer: Henrique Vitoi (hvitoi)
 
-pkgbase=linux
+pkgbase=linux-t2
 pkgver=6.5.2.arch1
 pkgrel=1
 pkgdesc='Linux'
@@ -30,6 +30,7 @@ options=('!strip')
 _srcname=archlinux-linux
 source=(
   "$_srcname::git+https://github.com/archlinux/linux?signed#tag=$_srctag"
+  patches::git+https://github.com/t2linux/linux-t2-patches
   config  # the main kernel config file
 )
 validpgpkeys=(
@@ -39,6 +40,7 @@ validpgpkeys=(
   C7E7849466FE2358343588377258734B41C31549  # David Runge <dvzrv@archlinux.org>
 )
 b2sums=('SKIP'
+        'SKIP'
         '283922a4b029a53921b2e2f68e34c45d8594dfdd3e9b0318d7cd7a6cd1c7ef5efd4eb6393d4b4695569966307aae4d3856fe1637d3eb2bfd4ec25a522ad5c6e7')
 
 export KBUILD_BUILD_HOST=archlinux
@@ -69,8 +71,14 @@ prepare() {
     patch -Np1 < "../$src"
   done
 
+  for t2_patch in $srcdir/patches/*.patch; do
+    echo "Applying t2 patch: $t2_patch"
+    patch -Np1 <$t2_patch
+  done
+
   echo "Setting config..."
   cp ../config .config
+  cat $srcdir/patches/extra_config >>.config
   _make olddefconfig
   diff -u ../config .config || :
 
