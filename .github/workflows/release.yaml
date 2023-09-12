@@ -1,0 +1,72 @@
+name: Release Package
+on:
+  push:
+    branches: ["main"]
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      package-name: ${{ steps.package-metadata.outputs.package-name }}
+      package-version: ${{ steps.package-metadata.outputs.package-version }}
+      package-released: ${{ steps.release-check.outputs.package-released }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Get Package Metadata
+        id: package-metadata
+        run: |
+          source ./PKGBUILD
+          echo "package-name=${pkgname}" >> "$GITHUB_OUTPUT"
+          echo "package-version=${pkgver}-${pkgrel}" >> "$GITHUB_OUTPUT"
+      - name: Check If Release Already Exists
+        id: release-check
+        run: |
+          if gh release view "${{ steps.package-metadata.outputs.package-version }}"; then
+            echo "package-released=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "package-released=false" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          GH_TOKEN: ${{ github.token }}
+  build:
+    runs-on: ubuntu-latest
+    needs: check
+    if: "! fromJSON(needs.check.outputs.package-released)"
+    container:
+      image: archlinux:base-devel
+    steps:
+      - name: Setup Environment
+        run: |
+          rm -rf /__t/*
+          useradd builder -mu 1001 
+          echo -e "builder ALL=(ALL:ALL) NOPASSWD: ALL" >> /etc/sudoers
+          pacman --noconfirm --noprogressbar -Syu
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+      - name: Make Package
+        run: |
+          su builder -c "gpg --keyserver hkps://keys.openpgp.org --recv-keys 3B94A80E50A477C7"
+          su builder -c "MAKEFLAGS=j$(nproc) makepkg --noconfirm --noprogressbar -s"
+      - name: Upload Package Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ needs.check.outputs.package-name }}-${{ needs.check.outputs.package-version }}
+          path: ./*.pkg.tar.*
+  release:
+    runs-on: ubuntu-latest
+    needs: [check, build]
+    permissions:
+      contents: write
+    steps:
+      - name: Download Package Artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: ${{ needs.check.outputs.package-name }}-${{ needs.check.outputs.package-version }}
+      - name: Release Package
+        uses: softprops/action-gh-release@v1
+        with:
+          name: ${{ needs.check.outputs.package-version }}
+          tag_name: ${{ needs.check.outputs.package-version }}
+          body: |
+            Install packages with `sudo pacman -U <file>`
+          files: ./*.pkg.tar.*

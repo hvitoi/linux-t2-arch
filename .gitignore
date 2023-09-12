@@ -1,0 +1,5 @@
+archlinux-linux/
+patches/
+src/
+pkg/
+*.pkg.tar.*
