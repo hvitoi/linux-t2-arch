@@ -59,7 +59,7 @@ jobs:
       contents: write
     steps:
       - name: Download Package Artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4.1.7
         with:
           name: ${{ needs.check.outputs.package-name }}-${{ needs.check.outputs.package-version }}
       - name: Release Package
